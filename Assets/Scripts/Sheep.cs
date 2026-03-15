@@ -18,6 +18,8 @@ public class Sheep : MonoBehaviour {
     Transform _dropShadow;
     Material _dropShadowMat;
 
+    Material test;
+
     Collider currentSheepCollider;
 
     int botLayer;
