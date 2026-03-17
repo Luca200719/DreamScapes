@@ -18,15 +18,13 @@ public class Sheep : MonoBehaviour {
     Transform _dropShadow;
     Material _dropShadowMat;
 
-    Material test;
-
     Collider currentSheepCollider;
 
     int botLayer;
 
     float stateSpeed = 2f;
     public float moveSpeed = 2f;
-    public float selectedHeight = 10f;
+    public float selectedHeight = 5f;
     public float surfaceOffset = 0.5f;
 
     public float screenCenterPull = 2.5f;

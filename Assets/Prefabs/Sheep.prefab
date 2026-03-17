@@ -465,7 +465,7 @@ MonoBehaviour:
   planet: {fileID: 0}
   planetRadius: 0
   moveSpeed: 2
-  selectedHeight: 10
+  selectedHeight: 5
   surfaceOffset: 0.5
   screenCenterPull: 2.5
   directionSmoothing: 100
