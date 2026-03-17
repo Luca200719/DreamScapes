@@ -839,6 +839,152 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!1 &660274083
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 660274084}
+  - component: {fileID: 660274085}
+  m_Layer: 0
+  m_Name: Lighting Controller
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &660274084
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 660274083}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 543450653674808964}
+  - {fileID: 1884224002}
+  - {fileID: 997483500}
+  - {fileID: 1951991241}
+  - {fileID: 922413109}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &660274085
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 660274083}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8f730fc70e322564db77fec530cbdb19, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DayNightCycle
+  dayDuration: 120
+  skyboxGradient:
+    serializedVersion: 2
+    key0: {r: 0.1607135, g: 0.20792696, b: 0.21383637, a: 1}
+    key1: {r: 0.59006757, g: 0.78198147, b: 0.9622642, a: 1}
+    key2: {r: 0.64059955, g: 0.8278554, b: 0.99371064, a: 0}
+    key3: {r: 0.5882353, g: 0.7803922, b: 0.9607844, a: 0}
+    key4: {r: 0.16078432, g: 0.20784315, b: 0.21568629, a: 0}
+    key5: {r: 0, g: 0, b: 0, a: 0}
+    key6: {r: 0, g: 0, b: 0, a: 0}
+    key7: {r: 0, g: 0, b: 0, a: 0}
+    ctime0: 2313
+    ctime1: 21074
+    ctime2: 33924
+    ctime3: 43433
+    ctime4: 59110
+    ctime5: 0
+    ctime6: 0
+    ctime7: 0
+    atime0: 0
+    atime1: 65535
+    atime2: 0
+    atime3: 0
+    atime4: 0
+    atime5: 0
+    atime6: 0
+    atime7: 0
+    m_Mode: 0
+    m_ColorSpace: -1
+    m_NumColorKeys: 5
+    m_NumAlphaKeys: 2
+  skyboxRenderer: {fileID: 1711813855608462827}
+  grassGradient:
+    serializedVersion: 2
+    key0: {r: 0.003921565, g: 0.21568628, b: 0.11097228, a: 1}
+    key1: {r: 0.07450979, g: 0.30980393, b: 0.15999532, a: 1}
+    key2: {r: 0.21176471, g: 0.58431375, b: 0.011764706, a: 0}
+    key3: {r: 0.44610065, g: 0.6117647, b: 0.18039213, a: 0}
+    key4: {r: 0.44705886, g: 0.6117647, b: 0.18039216, a: 0}
+    key5: {r: 0.27059138, g: 0.6227787, b: 0.044594616, a: 0}
+    key6: {r: 0.07450981, g: 0.30980393, b: 0.16078432, a: 0}
+    key7: {r: 0.003921565, g: 0.21568628, b: 0.10980393, a: 0}
+    ctime0: 7196
+    ctime1: 12465
+    ctime2: 22745
+    ctime3: 29427
+    ctime4: 36494
+    ctime5: 43947
+    ctime6: 53842
+    ctime7: 62323
+    atime0: 0
+    atime1: 65535
+    atime2: 0
+    atime3: 0
+    atime4: 0
+    atime5: 0
+    atime6: 0
+    atime7: 0
+    m_Mode: 0
+    m_ColorSpace: -1
+    m_NumColorKeys: 8
+    m_NumAlphaKeys: 2
+  litGradient:
+    serializedVersion: 2
+    key0: {r: 0.22401449, g: 0.34421736, b: 0.377, a: 1}
+    key1: {r: 0.35742256, g: 0.4528302, b: 0.44150048, a: 1}
+    key2: {r: 0.78800005, g: 0.4805934, b: 0.37668133, a: 0}
+    key3: {r: 1, g: 0.76474535, b: 0.44300002, a: 0}
+    key4: {r: 1, g: 0.8188074, b: 0.571, a: 0}
+    key5: {r: 0.7137255, g: 0.5147614, b: 0.4475059, a: 0}
+    key6: {r: 0.39169568, g: 0.495, b: 0.4863913, a: 0}
+    key7: {r: 0.22352941, g: 0.34509805, b: 0.3764706, a: 0}
+    ctime0: 1928
+    ctime1: 9895
+    ctime2: 17862
+    ctime3: 29041
+    ctime4: 36494
+    ctime5: 45875
+    ctime6: 52428
+    ctime7: 62451
+    atime0: 0
+    atime1: 65535
+    atime2: 0
+    atime3: 0
+    atime4: 0
+    atime5: 0
+    atime6: 0
+    atime7: 0
+    m_Mode: 0
+    m_ColorSpace: -1
+    m_NumColorKeys: 8
+    m_NumAlphaKeys: 2
+  planetRenderer: {fileID: 1711813855110389498}
+  sunLight: {fileID: 1884223998}
+  sunMesh: {fileID: 997483499}
+  fillLightsContainer: {fileID: 1951991241}
+  complementLightsContainer: {fileID: 922413109}
 --- !u!1 &675937958
 GameObject:
   m_ObjectHideFlags: 0
@@ -1392,8 +1538,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 922413108}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 0, z: -40}
+  m_LocalRotation: {x: -0.26640722, y: -0.24878037, z: -0.071383595, w: 0.9284611}
+  m_LocalPosition: {x: -10.604301, y: -33.914528, z: 18.367195}
   m_LocalScale: {x: 3, y: 3, z: 3}
   m_ConstrainProportionsScale: 1
   m_Children:
@@ -1403,7 +1549,7 @@ Transform:
   - {fileID: 472573334}
   - {fileID: 1025678087}
   - {fileID: 1918828539}
-  m_Father: {fileID: 1884224002}
+  m_Father: {fileID: 660274084}
   m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
 --- !u!1 &997483499
 GameObject:
@@ -1418,7 +1564,7 @@ GameObject:
   - component: {fileID: 997483502}
   - component: {fileID: 997483501}
   m_Layer: 0
-  m_Name: Sun
+  m_Name: Sun Mesh
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1432,12 +1578,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 997483499}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -275}
-  m_LocalScale: {x: 75, y: 75, z: 75}
+  m_LocalRotation: {x: -0.8448995, y: -0.12543845, z: -0.2263901, w: 0.46814275}
+  m_LocalPosition: {x: -72.90457, y: -233.16238, z: 126.274475}
+  m_LocalScale: {x: 75, y: 75, z: 75.000015}
   m_ConstrainProportionsScale: 1
   m_Children: []
-  m_Father: {fileID: 1884224002}
+  m_Father: {fileID: 660274084}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!135 &997483501
 SphereCollider:
@@ -2489,6 +2635,53 @@ MonoBehaviour:
   scrollSpeed: 5
   minDistance: 2
   maxDistance: 150
+--- !u!1 &1323419010
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1323419011}
+  - component: {fileID: 1323419012}
+  m_Layer: 0
+  m_Name: Sheep Manager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1323419011
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1323419010}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1323419012
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1323419010}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b298d66e1f01cb4e8ff9e0d4261d50d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SheepSpawner
+  planet: {fileID: 919132147575291695}
+  sheepPrefab: {fileID: 4427295489415076725, guid: e10fa610020ac944ea7e7726aca2ebd9, type: 3}
+  initialSheepCount: 100
 --- !u!1 &1371566998
 GameObject:
   m_ObjectHideFlags: 0
@@ -4180,122 +4373,13 @@ GameObject:
   - component: {fileID: 1884224002}
   - component: {fileID: 1884224001}
   - component: {fileID: 1884224000}
-  - component: {fileID: 1884223999}
   m_Layer: 0
-  m_Name: Key Light
+  m_Name: Sun Light
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1884223999
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1884223998}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8f730fc70e322564db77fec530cbdb19, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DayNightCycle
-  dayDuration: 120
-  skyboxGradient:
-    serializedVersion: 2
-    key0: {r: 0.1607135, g: 0.20792696, b: 0.21383637, a: 1}
-    key1: {r: 0.59006757, g: 0.78198147, b: 0.9622642, a: 1}
-    key2: {r: 0.64059955, g: 0.8278554, b: 0.99371064, a: 0}
-    key3: {r: 0.5882353, g: 0.7803922, b: 0.9607844, a: 0}
-    key4: {r: 0.16078432, g: 0.20784315, b: 0.21568629, a: 0}
-    key5: {r: 0, g: 0, b: 0, a: 0}
-    key6: {r: 0, g: 0, b: 0, a: 0}
-    key7: {r: 0, g: 0, b: 0, a: 0}
-    ctime0: 2313
-    ctime1: 21074
-    ctime2: 33924
-    ctime3: 43433
-    ctime4: 59110
-    ctime5: 0
-    ctime6: 0
-    ctime7: 0
-    atime0: 0
-    atime1: 65535
-    atime2: 0
-    atime3: 0
-    atime4: 0
-    atime5: 0
-    atime6: 0
-    atime7: 0
-    m_Mode: 0
-    m_ColorSpace: -1
-    m_NumColorKeys: 5
-    m_NumAlphaKeys: 2
-  skyboxRenderer: {fileID: 1711813855608462827}
-  grassGradient:
-    serializedVersion: 2
-    key0: {r: 0.003921565, g: 0.21568628, b: 0.11097228, a: 1}
-    key1: {r: 0.07450979, g: 0.30980393, b: 0.15999532, a: 1}
-    key2: {r: 0.21176471, g: 0.58431375, b: 0.011764706, a: 0}
-    key3: {r: 0.44610065, g: 0.6117647, b: 0.18039213, a: 0}
-    key4: {r: 0.44705886, g: 0.6117647, b: 0.18039216, a: 0}
-    key5: {r: 0.27059138, g: 0.6227787, b: 0.044594616, a: 0}
-    key6: {r: 0.07450981, g: 0.30980393, b: 0.16078432, a: 0}
-    key7: {r: 0.003921565, g: 0.21568628, b: 0.10980393, a: 0}
-    ctime0: 7196
-    ctime1: 12465
-    ctime2: 22745
-    ctime3: 29427
-    ctime4: 36494
-    ctime5: 43947
-    ctime6: 53842
-    ctime7: 62323
-    atime0: 0
-    atime1: 65535
-    atime2: 0
-    atime3: 0
-    atime4: 0
-    atime5: 0
-    atime6: 0
-    atime7: 0
-    m_Mode: 0
-    m_ColorSpace: -1
-    m_NumColorKeys: 8
-    m_NumAlphaKeys: 2
-  litGradient:
-    serializedVersion: 2
-    key0: {r: 0.22401449, g: 0.34421736, b: 0.377, a: 1}
-    key1: {r: 0.35742256, g: 0.4528302, b: 0.44150048, a: 1}
-    key2: {r: 0.78800005, g: 0.4805934, b: 0.37668133, a: 0}
-    key3: {r: 1, g: 0.76474535, b: 0.44300002, a: 0}
-    key4: {r: 1, g: 0.8188074, b: 0.571, a: 0}
-    key5: {r: 0.7137255, g: 0.5147614, b: 0.4475059, a: 0}
-    key6: {r: 0.39169568, g: 0.495, b: 0.4863913, a: 0}
-    key7: {r: 0.22352941, g: 0.34509805, b: 0.3764706, a: 0}
-    ctime0: 1928
-    ctime1: 9895
-    ctime2: 17862
-    ctime3: 29041
-    ctime4: 36494
-    ctime5: 45875
-    ctime6: 52428
-    ctime7: 62451
-    atime0: 0
-    atime1: 65535
-    atime2: 0
-    atime3: 0
-    atime4: 0
-    atime5: 0
-    atime6: 0
-    atime7: 0
-    m_Mode: 0
-    m_ColorSpace: -1
-    m_NumColorKeys: 8
-    m_NumAlphaKeys: 2
-  planetRenderer: {fileID: 1711813855110389498}
-  sunMesh: {fileID: 997483499}
-  fillLightsContainer: {fileID: 1951991241}
-  complementLightsContainer: {fileID: 922413109}
 --- !u!114 &1884224000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4515,11 +4599,8 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 997483500}
-  - {fileID: 1951991241}
-  - {fileID: 922413109}
-  m_Father: {fileID: 0}
+  m_Children: []
+  m_Father: {fileID: 660274084}
   m_LocalEulerAnglesHint: {x: -122.02, y: -30, z: 0}
 --- !u!1 &1892740018
 GameObject:
@@ -5025,7 +5106,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1951991240}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0.8448995, y: -0.12543845, z: -0.2263901, w: 0.46814275}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 1
@@ -5042,7 +5123,7 @@ Transform:
   - {fileID: 515022405}
   - {fileID: 1621426527}
   - {fileID: 1892740019}
-  m_Father: {fileID: 1884224002}
+  m_Father: {fileID: 660274084}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2013410473
 GameObject:
@@ -5356,12 +5437,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 919132149214215230}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 525, y: 525, z: 525}
   m_ConstrainProportionsScale: 1
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 660274084}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &919132147575291695
 GameObject:
@@ -5374,7 +5455,6 @@ GameObject:
   - component: {fileID: 543450652100896149}
   - component: {fileID: 3469287838030408240}
   - component: {fileID: 1711813855110389498}
-  - component: {fileID: 3469287838030408241}
   - component: {fileID: 3469287838030408242}
   m_Layer: 3
   m_Name: Planet
@@ -5515,20 +5595,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 919132147575291695}
   m_Mesh: {fileID: -5495902117074765545, guid: 8d8ec6785c66d3c41b8580250f9e9396, type: 3}
---- !u!114 &3469287838030408241
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 919132147575291695}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4b298d66e1f01cb4e8ff9e0d4261d50d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SheepSpawner
-  sheepPrefab: {fileID: 4427295489415076725, guid: e10fa610020ac944ea7e7726aca2ebd9, type: 3}
-  initialSheepCount: 100
 --- !u!135 &3469287838030408242
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -5554,9 +5620,9 @@ SphereCollider:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 1884224002}
-  - {fileID: 2013410475}
   - {fileID: 1312080325}
+  - {fileID: 660274084}
+  - {fileID: 2013410475}
   - {fileID: 543450652100896149}
   - {fileID: 768735408}
-  - {fileID: 543450653674808964}
+  - {fileID: 1323419011}

@@ -1,10 +1,6 @@
 using UnityEngine;
-using UnityEngine.Rendering.HighDefinition;
 
 public class DayNightCycle : MonoBehaviour {
-
-    Light _light;
-
     public float dayDuration = 120f;
 
     float _timeOfDay = 0f;
@@ -23,6 +19,9 @@ public class DayNightCycle : MonoBehaviour {
     public MeshRenderer planetRenderer;
     Material _planetMat;
 
+    public GameObject sunLight;
+    Light _sunLight;
+
     public GameObject sunMesh;
     Material _sunMat;
     
@@ -40,10 +39,10 @@ public class DayNightCycle : MonoBehaviour {
     static readonly int SunIntensity = Shader.PropertyToID("_Intensity");
 
     void Start() {
-        _light = GetComponent<Light>();
-
         _skyboxMat = skyboxRenderer.material;
         _planetMat = planetRenderer.material;
+
+        _sunLight = sunLight.GetComponent<Light>();
 
         _sunMat = sunMesh.GetComponent<Renderer>().material;
 
@@ -60,8 +59,8 @@ public class DayNightCycle : MonoBehaviour {
         }
 
         float lightAngle = Mathf.Sin(_timeOfDay * Mathf.PI);
-        _light.intensity = Mathf.Max(3000f, lightAngle * 15000f);
-        _light.colorTemperature = 11000f - lightAngle * 5500f;
+        _sunLight.intensity = Mathf.Max(3000f, lightAngle * 15000f);
+        _sunLight.colorTemperature = 11000f - lightAngle * 5500f;
 
         transform.rotation = Quaternion.Euler(_timeOfDay * 360f - 122.02f, -30f, 0f);
 
