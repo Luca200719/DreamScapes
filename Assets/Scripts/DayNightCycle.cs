@@ -75,7 +75,7 @@ public class DayNightCycle : MonoBehaviour {
 
         float sunStep = Mathf.SmoothStep(0f, 1f, lightAngle);
 
-        sunMesh.transform.localScale = Vector3.one * (50f + sunStep * 45f);
+        sunMesh.transform.localScale = Vector3.one * (25f + sunStep * 22.5f);
 
         _sunMat.SetColor(SunBaseColor, litColor);
         _sunMat.SetFloat(SunIntensity, 40000f + sunStep * 40000f);

@@ -464,6 +464,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Sheep
   planet: {fileID: 0}
   planetRadius: 0
+  manager: {fileID: 0}
   moveSpeed: 2
   selectedHeight: 5
   surfaceOffset: 0.5
@@ -471,6 +472,10 @@ MonoBehaviour:
   directionSmoothing: 100
   screenCenterDeadZone: 0.01
   maxScreenDistance: 0.05
+  approachSpeed: 1.5
+  nuzzleDistance: 0.5
+  interactionSleepDuration: 3
+  isSleeping: 0
 --- !u!95 &2899189273870187352
 Animator:
   serializedVersion: 7

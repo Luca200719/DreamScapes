@@ -99,20 +99,19 @@ public class PlanetCameraOrbit : MonoBehaviour {
         }
 
         if (isRotating) {
-            bool yawClose = Mathf.Abs(Mathf.DeltaAngle(_currentYaw, _targetYaw)) < 0.5f;
-            bool pitchClose = Mathf.Abs(Mathf.DeltaAngle(_currentPitch, _targetPitch)) < 0.5f;
-            bool distanceClose = Mathf.Abs(_currentDistance - _targetDistance) < 0.05f;
+            bool yawClose = Mathf.Abs(Mathf.DeltaAngle(_currentYaw, _targetYaw)) < 0.05f;
+            bool pitchClose = Mathf.Abs(Mathf.DeltaAngle(_currentPitch, _targetPitch)) < 0.05f;
 
             _currentYaw = Mathf.LerpAngle(_currentYaw, _targetYaw, smoothing * Time.deltaTime);
             _currentPitch = Mathf.LerpAngle(_currentPitch, _targetPitch, smoothing * Time.deltaTime);
             _currentDistance = Mathf.Lerp(_currentDistance, _targetDistance, smoothing * Time.deltaTime);
             ApplyOrbit();
 
-            if (yawClose && pitchClose && distanceClose && pressingSheep && currSheep != null) {
+            if (yawClose && pitchClose && pressingSheep && currSheep != null) {
                 currSheep.NotifyCameraReady();
             }
 
-            if (yawClose && pitchClose && distanceClose && !pressingPlanet && !pressingSheep) {
+            if (yawClose && pitchClose && !pressingPlanet && !pressingSheep) {
                 _currentYaw = _targetYaw;
                 _currentPitch = _targetPitch;
                 _currentDistance = _targetDistance;

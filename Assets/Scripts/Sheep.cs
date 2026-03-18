@@ -11,7 +11,7 @@ public class Sheep : MonoBehaviour {
     static readonly int AnimWalking = Animator.StringToHash("isWalking");
     static readonly int AnimGrazing = Animator.StringToHash("isGrazing");
     static readonly int AnimInAir = Animator.StringToHash("isInAir");
-    static readonly int AnimSleeping = Animator.StringToHash("isSleeping"); // add this bool to your Animator
+    static readonly int AnimSleeping = Animator.StringToHash("isSleeping");
 
     Transform _mesh;
     BoxCollider _surfaceCollider;
@@ -34,10 +34,12 @@ public class Sheep : MonoBehaviour {
     public float maxScreenDistance = 0.05f;
 
     public float approachSpeed = 1.5f;
-    public float nuzzleDistance = -0.5f; // negative = overlap before triggering
+    public float touchDistance = 1.5f; // should match your collider diameter
+    public float nuzzleDistance = 4f; // at planetRadius 12, ~4 keeps them visibly apart while sleeping
     public float interactionSleepDuration = 3f;
 
     bool changingHeight;
+    Vector3 _safeDropTarget;
     float _currentMeshOffset = 0f;
     float _targetMeshOffset = 0f;
 
@@ -61,7 +63,6 @@ public class Sheep : MonoBehaviour {
 
     void Start() {
         _animator = GetComponent<Animator>();
-
         _mesh = transform.GetChild(0);
         _surfaceCollider = transform.GetChild(1).GetComponent<BoxCollider>();
         _bodyMat = _mesh.GetChild(4).GetComponent<MeshRenderer>().material;
@@ -83,6 +84,12 @@ public class Sheep : MonoBehaviour {
                 changingHeight = false;
             }
             _mesh.localPosition = Vector3.up * _currentMeshOffset;
+
+            // Slide to safe drop position over the same duration as the descent
+            if (_safeDropTarget != Vector3.zero) {
+                transform.position = Vector3.Slerp(transform.position, _safeDropTarget, 10f * Time.deltaTime);
+                if (!changingHeight) _safeDropTarget = Vector3.zero;
+            }
         }
 
         if (isSleeping) return;
@@ -102,6 +109,7 @@ public class Sheep : MonoBehaviour {
                 CheckForSheep();
             }
 
+            // Wander timer only ticks when not in a sequence
             _wanderTimer -= Time.deltaTime * stateSpeed;
             if (_wanderTimer <= 0) {
                 _wanderTimer = 2 + Random.Range(-1f, 1f);
@@ -125,81 +133,123 @@ public class Sheep : MonoBehaviour {
 
     // --- INTERACTION SEQUENCE ---
 
-    // Called on the dropped sheep when it lands on another.
-    // Both sheep run InteractionSequence independently in parallel.
     public void StartInteraction(Sheep other) {
-        StartCoroutine(InteractionSequence(other));
-        other.StartCoroutine(other.InteractionSequence(this));
+        // Set _facingDirection directly so turning begins this frame, not after a slow lerp
+        Vector3 sn = transform.position.normalized;
+        Vector3 toOther = Vector3.ProjectOnPlane(
+            (other.transform.position - transform.position).normalized, sn).normalized;
+        if (toOther.sqrMagnitude > 0.0001f) {
+            _facingDirection = toOther;
+            _moveDirection = toOther;
+        }
+
+        Vector3 snO = other.transform.position.normalized;
+        Vector3 toThis = Vector3.ProjectOnPlane(
+            (transform.position - other.transform.position).normalized, snO).normalized;
+        if (toThis.sqrMagnitude > 0.0001f) {
+            other._facingDirection = toThis;
+            other._moveDirection = toThis;
+        }
+
+        StartCoroutine(InteractionSequence(other, isInitiator: true));
+        other.StartCoroutine(other.InteractionSequence(this, isInitiator: false));
     }
 
-    IEnumerator InteractionSequence(Sheep other) {
-        isSleeping = true; // lock out normal Update behaviour immediately
-
-        // Wait for this sheep to finish landing
+    IEnumerator InteractionSequence(Sheep other, bool isInitiator) {
+        // Don't set isSleeping yet — let SmoothFacing run so they turn during descent
         while (changingHeight) yield return null;
-
-        // Wait for the other sheep to land too
         while (other.changingHeight) yield return null;
 
-        // Approach: walk toward each other until heads are within nuzzleDistance
+        // Lock out normal behaviour only once on the ground
+        isSleeping = true;
+
         _animator.SetBool(AnimWalking, true);
         _animator.SetBool(AnimGrazing, false);
         _animator.SetBool(AnimInAir, false);
 
-        while (true) {
-            Vector3 surfaceNormal = transform.position.normalized;
-            Vector3 toOther = Vector3.ProjectOnPlane(
-                (other.transform.position - transform.position).normalized,
-                surfaceNormal
-            ).normalized;
+        // Phase 1: only initiator walks forward — non-initiator stands still and faces
+        // This guarantees controlled contact at exactly touchDistance
+        if (isInitiator) {
+            while (true) {
+                float dist = Vector3.Distance(transform.position, other.transform.position);
+                if (dist <= touchDistance) break;
 
-            float dist = Vector3.Distance(transform.position, other.transform.position);
-            if (dist <= nuzzleDistance) break;
+                Vector3 surfaceNormal = transform.position.normalized;
+                Vector3 toOther = Vector3.ProjectOnPlane(
+                    (other.transform.position - transform.position).normalized,
+                    surfaceNormal
+                ).normalized;
 
-            // Always steer facing toward the other sheep
-            if (toOther.sqrMagnitude > 0.0001f) {
-                _facingDirection = Vector3.Slerp(_facingDirection, toOther, directionSmoothing * Time.deltaTime);
+                _facingDirection = Vector3.Slerp(_facingDirection, toOther, 3f * Time.deltaTime);
                 _facingDirection = Vector3.ProjectOnPlane(_facingDirection, surfaceNormal).normalized;
                 transform.rotation = Quaternion.LookRotation(_facingDirection, surfaceNormal);
-            }
 
-            // Dead zone: only move once facing is roughly aligned with toOther
-            // This prevents curving past each other — they rotate in place first
-            float alignment = Vector3.Dot(_facingDirection, toOther);
-            if (alignment > 0.85f) {
-                transform.position += _facingDirection * (approachSpeed * Time.deltaTime);
+                if (Vector3.Dot(_facingDirection, toOther) > 0.7f) {
+                    transform.position += _facingDirection * (approachSpeed * Time.deltaTime);
+                    SnapToSurface();
+                }
+
+                yield return null;
+            }
+        }
+        else {
+            // Non-initiator just faces the initiator and waits
+            while (Vector3.Distance(transform.position, other.transform.position) > touchDistance) {
+                Vector3 surfaceNormal = transform.position.normalized;
+                Vector3 toOther = Vector3.ProjectOnPlane(
+                    (other.transform.position - transform.position).normalized,
+                    surfaceNormal
+                ).normalized;
+
+                _facingDirection = Vector3.Slerp(_facingDirection, toOther, 3f * Time.deltaTime);
+                _facingDirection = Vector3.ProjectOnPlane(_facingDirection, surfaceNormal).normalized;
+                transform.rotation = Quaternion.LookRotation(_facingDirection, surfaceNormal);
+
+                yield return null;
+            }
+        }
+
+        // Phase 2: only initiator backs up — non-initiator stays still
+        // This way distance actually increases and the loop can exit
+        if (isInitiator) {
+            while (true) {
+                float dist = Vector3.Distance(transform.position, other.transform.position);
+                if (dist >= nuzzleDistance) break;
+
+                // Back up along the surface directly away — -_facingDirection is already correct
+                Vector3 surfaceNormal = transform.position.normalized;
+                Vector3 back = Vector3.ProjectOnPlane(-_facingDirection, surfaceNormal).normalized;
+                transform.position += back * (approachSpeed * Time.deltaTime);
                 SnapToSurface();
-            }
 
-            yield return null;
+                yield return null;
+            }
+        }
+        else {
+            // Non-initiator just waits until the initiator has backed up enough
+            while (Vector3.Distance(transform.position, other.transform.position) < nuzzleDistance)
+                yield return null;
         }
 
         _animator.SetBool(AnimWalking, false);
 
-        // One sheep triggers the spawn — position tie-break ensures only one fires
-        if (transform.position.sqrMagnitude >= other.transform.position.sqrMagnitude) {
+        // Initiator triggers spawn, non-initiator waits the same time so both sleep together
+        if (isInitiator) {
             Vector3 midpoint = (transform.position + other.transform.position) * 0.5f;
-
-            // TODO: replace with your animated instantiation sequence, e.g:
+            // TODO: yield on your spawn animation here, e.g:
             //   yield return StartCoroutine(manager.PlaySpawnSequence(midpoint));
-            // The spawn and its animation play here in full before sleep begins.
             yield return new WaitForSeconds(manager.spawnAnimationDuration);
             manager.QueueSpawn(midpoint);
         }
         else {
-            // Non-initiator waits the same duration so both enter sleep together
             yield return new WaitForSeconds(manager.spawnAnimationDuration);
         }
 
-        // Both sheep go to sleep
         _animator.SetBool(AnimSleeping, true);
-
         yield return new WaitForSeconds(interactionSleepDuration);
 
-        // Wake up and resume
         _animator.SetBool(AnimSleeping, false);
         _animator.SetBool(AnimWalking, true);
-
         isGrazing = false;
         isSleeping = false;
         _wanderTimer = 2f + Random.Range(-1f, 1f);
@@ -212,7 +262,6 @@ public class Sheep : MonoBehaviour {
         _animator.SetBool(AnimWalking, false);
         _animator.SetBool(AnimGrazing, false);
         _animator.SetBool(AnimInAir, true);
-
         FadeDropShadow(0.4f);
 
         selected = true;
@@ -237,16 +286,13 @@ public class Sheep : MonoBehaviour {
         _targetMeshOffset = 0;
         changingHeight = true;
 
-        // Smoothly nudge to a clear position — never inside another sheep
-        Vector3 safePos = FindSafeDropPosition();
-        transform.position = Vector3.Lerp(transform.position, safePos, 0.85f);
+        _safeDropTarget = FindSafeDropPosition();
         SnapToSurface();
 
         if (currentSheepCollider != null) {
             Sheep other = currentSheepCollider.transform.parent.parent.GetComponent<Sheep>();
             other.FadeHighlight(0f);
             currentSheepCollider = null;
-            // Interaction still queues — they'll walk to each other from their safe positions
             StartInteraction(other);
             return;
         }
@@ -288,7 +334,6 @@ public class Sheep : MonoBehaviour {
 
         Vector2 screenDelta = _screenCenter - new Vector2(sheepScreen.x, sheepScreen.y);
         float distance = screenDelta.magnitude;
-
         if (distance < deadZonePx) return;
 
         float t = (distance - deadZonePx) / (maxDistPx - deadZonePx);
@@ -300,7 +345,6 @@ public class Sheep : MonoBehaviour {
 
         Vector3 worldNudge = (camRight * screenDelta.x + camUp * screenDelta.y).normalized;
         Vector3 targetDir = Vector3.ProjectOnPlane(worldNudge, surfaceNormal).normalized;
-
         if (targetDir.sqrMagnitude < 0.0001f) return;
 
         float speed = moveSpeed * screenCenterPull * pullStrength;
@@ -318,7 +362,6 @@ public class Sheep : MonoBehaviour {
 
         if (hits.Length > 0) {
             Sheep candidate = hits[0].transform.parent.parent.GetComponent<Sheep>();
-            // Don't highlight or allow dropping onto a sheep that's already in a sequence
             if (!candidate.isSleeping && currentSheepCollider != hits[0]) {
                 if (currentSheepCollider != null)
                     currentSheepCollider.transform.parent.parent.GetComponent<Sheep>().FadeHighlight(0f);
@@ -339,20 +382,16 @@ public class Sheep : MonoBehaviour {
     void SmoothFacing() {
         Vector3 surfaceNormal = transform.position.normalized;
         Vector3 target = Vector3.ProjectOnPlane(_moveDirection, surfaceNormal).normalized;
-
         if (target.sqrMagnitude < 0.0001f) return;
 
         float smoothSpeed = selected ? directionSmoothing : 3f;
 
-        // Steer facing toward the desired direction
         _facingDirection = Vector3.Slerp(_facingDirection, target, smoothSpeed * Time.deltaTime);
         _facingDirection = Vector3.ProjectOnPlane(_facingDirection, surfaceNormal).normalized;
-
         transform.rotation = Quaternion.LookRotation(_facingDirection, surfaceNormal);
     }
 
     void MoveOnSurface() {
-        // Always move in the direction the sheep is facing — turning feels car-like
         transform.position += _facingDirection * (moveSpeed * Time.deltaTime);
     }
 
@@ -363,18 +402,16 @@ public class Sheep : MonoBehaviour {
         if (!Physics.CheckSphere(basePos, 0.8f, botLayer))
             return basePos;
 
-        // Spiral outward until a clear spot is found
         Vector3 right = Vector3.ProjectOnPlane(Vector3.right, surfaceNormal).normalized;
         if (right.sqrMagnitude < 0.001f)
             right = Vector3.ProjectOnPlane(Vector3.forward, surfaceNormal).normalized;
         Vector3 fwd = Vector3.Cross(surfaceNormal, right).normalized;
 
         for (int i = 1; i <= 16; i++) {
-            float angle = i * 37f * Mathf.Deg2Rad; // golden angle spiral
+            float angle = i * 37f * Mathf.Deg2Rad;
             float radius = i * 0.5f;
             Vector3 offset = (right * Mathf.Cos(angle) + fwd * Mathf.Sin(angle)) * radius;
             Vector3 candidate = (basePos + offset).normalized * (planetRadius + surfaceOffset);
-
             if (!Physics.CheckSphere(candidate, 0.8f, botLayer))
                 return candidate;
         }
@@ -389,29 +426,9 @@ public class Sheep : MonoBehaviour {
     }
 
     void CheckForSheep() {
-        // Raycast ahead to avoid walking into other sheep
-        bool blocked = true;
-        while (blocked) {
-            if (Physics.Raycast(transform.position, _facingDirection, out hit, 2f, botLayer))
-                PickNewWanderDirection();
-            else
-                blocked = false;
-        }
-
-        // Also push away if already overlapping — prevents stumbling into a drop zone
-        Collider[] overlapping = Physics.OverlapSphere(transform.position, 0.8f, botLayer);
-        foreach (Collider col in overlapping) {
-            if (col.transform.parent.parent == transform) continue; // skip self
-            Vector3 surfaceNormal = transform.position.normalized;
-            Vector3 away = Vector3.ProjectOnPlane(
-                (transform.position - col.transform.parent.parent.position).normalized,
-                surfaceNormal
-            ).normalized;
-            if (away.sqrMagnitude > 0.0001f) {
-                _facingDirection = away;
-                _moveDirection = away;
-            }
-        }
+        // Single raycast — no loop, no crash risk
+        if (Physics.Raycast(transform.position, _facingDirection, out hit, 2f, botLayer))
+            PickNewWanderDirection();
     }
 
     void PickNewWanderDirection() {
@@ -451,7 +468,6 @@ public class Sheep : MonoBehaviour {
         Color currentEmissive = _bodyMat.GetColor("_EmissiveColor");
         float currentIntensity = currentEmissive.r / baseColor.r;
         float t = 0f;
-
         while (t < 1f) {
             t += Time.deltaTime * 5f;
             _bodyMat.SetColor("_EmissiveColor", baseColor * Mathf.Lerp(currentIntensity, targetIntensity, t));
@@ -468,7 +484,6 @@ public class Sheep : MonoBehaviour {
         float currentIntensity = _dropShadowMat.color.a;
         Color c = _dropShadowMat.color;
         float t = 0f;
-
         while (t < 1f) {
             t += Time.deltaTime * 5f;
             c.a = Mathf.Lerp(currentIntensity, targetIntensity, t);

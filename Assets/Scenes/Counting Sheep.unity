@@ -1580,8 +1580,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0.8448995, y: -0.12543845, z: -0.2263901, w: 0.46814275}
   m_LocalPosition: {x: -72.90457, y: -233.16238, z: 126.274475}
-  m_LocalScale: {x: 75, y: 75, z: 75.000015}
-  m_ConstrainProportionsScale: 1
+  m_LocalScale: {x: 37.5, y: 37.5, z: 37.5}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 660274084}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -1604,7 +1604,7 @@ SphereCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Radius: 0.5
+  m_Radius: 1
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!23 &997483502
 MeshRenderer:
@@ -1662,7 +1662,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 997483499}
-  m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+  m_Mesh: {fileID: -5495902117074765545, guid: 8d8ec6785c66d3c41b8580250f9e9396, type: 3}
 --- !u!1 &1025678086
 GameObject:
   m_ObjectHideFlags: 0
@@ -2396,6 +2396,7 @@ GameObject:
   - component: {fileID: 1312080326}
   - component: {fileID: 1312080323}
   - component: {fileID: 1312080322}
+  - component: {fileID: 1312080327}
   m_Layer: 0
   m_Name: Camera
   m_TagString: MainCamera
@@ -2422,7 +2423,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1
   volumeAnchorOverride: {fileID: 0}
-  antialiasing: 0
+  antialiasing: 3
   SMAAQuality: 2
   dithering: 0
   stopNaNs: 0
@@ -2635,6 +2636,43 @@ MonoBehaviour:
   scrollSpeed: 5
   minDistance: 2
   maxDistance: 150
+--- !u!114 &1312080327
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1312080321}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26d6499a6bd256e47b859377446493a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.HighDefinition.Runtime::UnityEngine.Rendering.HighDefinition.CustomPassVolume
+  m_IsGlobal: 1
+  fadeRadius: 0
+  priority: 0
+  customPasses:
+  - rid: 4387787372797100113
+  injectionPoint: 2
+  m_TargetCamera: {fileID: 0}
+  useTargetCamera: 0
+  references:
+    version: 2
+    RefIds:
+    - rid: 4387787372797100113
+      type: {class: DitherPass, ns: , asm: Assembly-CSharp}
+      data:
+        m_Name: Dither Pass
+        enabled: 1
+        targetColorBuffer: 0
+        targetDepthBuffer: 0
+        clearFlags: 0
+        passFoldout: 0
+        m_Version: 0
+        ditherShader: {fileID: 4800000, guid: 23e8fa1b980838b44a46d6f42c7f0002, type: 3}
+        strength: 0.2
+        levels: 32
+        noiseAmount: 0.8
 --- !u!1 &1323419010
 GameObject:
   m_ObjectHideFlags: 0
@@ -2681,7 +2719,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SheepSpawner
   planet: {fileID: 919132147575291695}
   sheepPrefab: {fileID: 4427295489415076725, guid: e10fa610020ac944ea7e7726aca2ebd9, type: 3}
-  initialSheepCount: 100
+  initialSheepCount: 2
+  sheep: []
+  spawnAnimationDuration: 2
 --- !u!1 &1371566998
 GameObject:
   m_ObjectHideFlags: 0
