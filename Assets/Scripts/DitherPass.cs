@@ -1,6 +1,7 @@
+using System;
 using UnityEngine;
-using UnityEngine.Rendering.HighDefinition;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.HighDefinition;
 
 public class DitherPass : CustomPass {
     public Shader ditherShader;

@@ -2670,9 +2670,9 @@ MonoBehaviour:
         passFoldout: 0
         m_Version: 0
         ditherShader: {fileID: 4800000, guid: 23e8fa1b980838b44a46d6f42c7f0002, type: 3}
-        strength: 0.2
+        strength: 0.25
         levels: 32
-        noiseAmount: 0.8
+        noiseAmount: 0.5
 --- !u!1 &1323419010
 GameObject:
   m_ObjectHideFlags: 0

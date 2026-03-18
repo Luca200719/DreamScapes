@@ -7,59 +7,54 @@ public class Sheep : MonoBehaviour {
     [HideInInspector] public float planetRadius;
     [HideInInspector] public SheepManager manager;
 
+    public float moveSpeed = 2f;
+    public float selectedHeight = 5f;
+    public float surfaceOffset = 0.5f;
+    public float screenCenterPull = 2.5f;
+    public float directionSmoothing = 8f;
+    public float screenCenterDeadZone = 0.01f;
+    public float maxScreenDistance = 0.05f;
+
+    enum State { Walking = 0, Grazing = 1, Held = 2 }
+    State _state = State.Walking;
+
+    void EnterState(State s) {
+        _state = s;
+        _animator.SetInteger(AnimState, (int)s);
+    }
+
     Animator _animator;
-    static readonly int AnimWalking = Animator.StringToHash("isWalking");
-    static readonly int AnimGrazing = Animator.StringToHash("isGrazing");
-    static readonly int AnimInAir = Animator.StringToHash("isInAir");
-    static readonly int AnimSleeping = Animator.StringToHash("isSleeping");
+    static readonly int AnimState = Animator.StringToHash("state");
 
     Transform _mesh;
     BoxCollider _surfaceCollider;
     Material _bodyMat;
     Transform _dropShadow;
     Material _dropShadowMat;
+    int _botLayer;
 
-    Collider currentSheepCollider;
-
-    int botLayer;
-
-    float stateSpeed = 2f;
-    public float moveSpeed = 2f;
-    public float selectedHeight = 5f;
-    public float surfaceOffset = 0.5f;
-
-    public float screenCenterPull = 2.5f;
-    public float directionSmoothing = 100f;
-    public float screenCenterDeadZone = 0.01f;
-    public float maxScreenDistance = 0.05f;
-
-    public float approachSpeed = 1.5f;
-    public float touchDistance = 1.5f; // should match your collider diameter
-    public float nuzzleDistance = 4f; // at planetRadius 12, ~4 keeps them visibly apart while sleeping
-    public float interactionSleepDuration = 3f;
-
-    bool changingHeight;
-    Vector3 _safeDropTarget;
-    float _currentMeshOffset = 0f;
-    float _targetMeshOffset = 0f;
-
-    Vector3 _moveDirection;
-    Vector3 _facingDirection;
-
+    Vector3 _moveDir;
+    Vector3 _facingDir;
     float _wanderTimer;
-    RaycastHit hit;
-    float pickState;
-    bool isGrazing = false;
-    bool selected = false;
-    [HideInInspector] public bool isSleeping = false;
+    float _speedScale;
 
-    bool _cameraReady;
-    public bool CameraReady => _cameraReady;
-    PlanetCameraOrbit _camController;
-    Vector2 _screenCenter;
+    bool _changingHeight;
+    float _meshOffset;
+    float _meshOffsetTarget;
+    float _descentTimer;
+    Vector3 _safeDropTarget;
+    State _pendingState;
+    bool _hasPendingState;
 
-    Coroutine currentlyFadingHighlight = null;
-    Coroutine currentlyFadingDropShadow = null;
+    static PlanetCameraController _cam;
+    static Vector2 _screenCenter;
+
+    bool _cameraAligned;
+    bool _facingFrozen;
+    Collider _hoveredCollider;
+
+    Coroutine _highlightCoroutine;
+    Coroutine _shadowCoroutine;
 
     void Start() {
         _animator = GetComponent<Animator>();
@@ -68,430 +63,297 @@ public class Sheep : MonoBehaviour {
         _bodyMat = _mesh.GetChild(4).GetComponent<MeshRenderer>().material;
         _dropShadow = transform.GetChild(2);
         _dropShadowMat = transform.GetChild(2).GetComponent<MeshRenderer>().material;
+        _botLayer = LayerMask.GetMask("BotRaycast");
 
-        botLayer = LayerMask.GetMask("BotRaycast");
-        _wanderTimer = 2 + Random.Range(-1f, 1f);
+        _speedScale = 1f;
+        _wanderTimer = Random.Range(1f, 3f);
         SnapToSurface();
-        PickNewWanderDirection();
-        _facingDirection = _moveDirection;
+        PickWanderDir();
+        _facingDir = _moveDir;
+        EnterState(State.Walking);
     }
 
     void Update() {
-        if (changingHeight) {
-            _currentMeshOffset = Mathf.Lerp(_currentMeshOffset, _targetMeshOffset, 10f * Time.deltaTime);
-            if (Mathf.Abs(_currentMeshOffset - _targetMeshOffset) < 0.001f) {
-                _currentMeshOffset = _targetMeshOffset;
-                changingHeight = false;
-            }
-            _mesh.localPosition = Vector3.up * _currentMeshOffset;
+        UpdateDescent();
 
-            // Slide to safe drop position over the same duration as the descent
-            if (_safeDropTarget != Vector3.zero) {
-                transform.position = Vector3.Slerp(transform.position, _safeDropTarget, 10f * Time.deltaTime);
-                if (!changingHeight) _safeDropTarget = Vector3.zero;
-            }
-        }
-
-        if (isSleeping) return;
-
-        if (selected) {
-            if (_cameraReady) {
-                NudgeTowardScreenCenter();
-                CheckSheepCollisions();
-            }
-            SmoothFacing();
-        }
-        else {
-            if (!isGrazing) {
-                MoveOnSurface();
-                SnapToSurface();
-                SmoothFacing();
-                CheckForSheep();
-            }
-
-            // Wander timer only ticks when not in a sequence
-            _wanderTimer -= Time.deltaTime * stateSpeed;
-            if (_wanderTimer <= 0) {
-                _wanderTimer = 2 + Random.Range(-1f, 1f);
-                pickState = Random.value;
-                if (pickState > 0.4f) {
-                    isGrazing = false;
-                    stateSpeed = 1f;
-                    _animator.SetBool(AnimGrazing, false);
-                    _animator.SetBool(AnimWalking, true);
-                    PickNewWanderDirection();
+        switch (_state) {
+            case State.Walking:
+            case State.Grazing:
+                UpdateWander();
+                break;
+            case State.Held:
+                if (_cameraAligned) {
+                    NudgeToScreenCenter();
+                    CheckForSuitors();
                 }
-                else {
-                    isGrazing = true;
-                    stateSpeed = 2f;
-                    _animator.SetBool(AnimGrazing, true);
-                    _animator.SetBool(AnimWalking, false);
-                }
-            }
+                if (!_facingFrozen) SmoothFacing(directionSmoothing);
+                break;
         }
     }
 
-    // --- INTERACTION SEQUENCE ---
+    void UpdateWander() {
+        _speedScale = Mathf.MoveTowards(_speedScale, 1f, 1.5f * Time.deltaTime);
 
-    public void StartInteraction(Sheep other) {
-        // Set _facingDirection directly so turning begins this frame, not after a slow lerp
-        Vector3 sn = transform.position.normalized;
-        Vector3 toOther = Vector3.ProjectOnPlane(
-            (other.transform.position - transform.position).normalized, sn).normalized;
-        if (toOther.sqrMagnitude > 0.0001f) {
-            _facingDirection = toOther;
-            _moveDirection = toOther;
+        if (_state == State.Walking) {
+            transform.position += _facingDir * (moveSpeed * _speedScale * Time.deltaTime);
+            if (!_changingHeight) SeparateFromNearbySheep();
+
+            SnapToSurface();
+            SmoothFacing(3f);
+            if (Physics.Raycast(transform.position, _facingDir, 2f, _botLayer))
+                PickWanderDir();
         }
 
-        Vector3 snO = other.transform.position.normalized;
-        Vector3 toThis = Vector3.ProjectOnPlane(
-            (transform.position - other.transform.position).normalized, snO).normalized;
-        if (toThis.sqrMagnitude > 0.0001f) {
-            other._facingDirection = toThis;
-            other._moveDirection = toThis;
-        }
+        _wanderTimer -= Time.deltaTime;
+        if (_wanderTimer > 0f) return;
 
-        StartCoroutine(InteractionSequence(other, isInitiator: true));
-        other.StartCoroutine(other.InteractionSequence(this, isInitiator: false));
+        _wanderTimer = Random.Range(1f, 3f);
+        if (Random.value > 0.4f) { EnterState(State.Walking); PickWanderDir(); }
+        else EnterState(State.Grazing);
     }
 
-    IEnumerator InteractionSequence(Sheep other, bool isInitiator) {
-        // Don't set isSleeping yet — let SmoothFacing run so they turn during descent
-        while (changingHeight) yield return null;
-        while (other.changingHeight) yield return null;
-
-        // Lock out normal behaviour only once on the ground
-        isSleeping = true;
-
-        _animator.SetBool(AnimWalking, true);
-        _animator.SetBool(AnimGrazing, false);
-        _animator.SetBool(AnimInAir, false);
-
-        // Phase 1: only initiator walks forward — non-initiator stands still and faces
-        // This guarantees controlled contact at exactly touchDistance
-        if (isInitiator) {
-            while (true) {
-                float dist = Vector3.Distance(transform.position, other.transform.position);
-                if (dist <= touchDistance) break;
-
-                Vector3 surfaceNormal = transform.position.normalized;
-                Vector3 toOther = Vector3.ProjectOnPlane(
-                    (other.transform.position - transform.position).normalized,
-                    surfaceNormal
-                ).normalized;
-
-                _facingDirection = Vector3.Slerp(_facingDirection, toOther, 3f * Time.deltaTime);
-                _facingDirection = Vector3.ProjectOnPlane(_facingDirection, surfaceNormal).normalized;
-                transform.rotation = Quaternion.LookRotation(_facingDirection, surfaceNormal);
-
-                if (Vector3.Dot(_facingDirection, toOther) > 0.7f) {
-                    transform.position += _facingDirection * (approachSpeed * Time.deltaTime);
-                    SnapToSurface();
-                }
-
-                yield return null;
-            }
+    void SeparateFromNearbySheep() {
+        const float r = 1.5f;
+        foreach (var c in Physics.OverlapSphere(_surfaceCollider.bounds.center, r, _botLayer)) {
+            var other = SheepFrom(c);
+            if (other == null || other == this || other._changingHeight || other._hasPendingState) continue; Vector3 sn = transform.position.normalized;
+            Vector3 away = Vector3.ProjectOnPlane(transform.position - other.transform.position, sn);
+            float overlap = r - away.magnitude;
+            if (overlap <= 0f) continue;
+            if (away.sqrMagnitude < 0.0001f) away = Vector3.ProjectOnPlane(Random.onUnitSphere, sn);
+            transform.position += away.normalized * overlap;
+            SnapToSurface();
+            _moveDir = Vector3.Slerp(_moveDir, away.normalized, 0.5f);
         }
-        else {
-            // Non-initiator just faces the initiator and waits
-            while (Vector3.Distance(transform.position, other.transform.position) > touchDistance) {
-                Vector3 surfaceNormal = transform.position.normalized;
-                Vector3 toOther = Vector3.ProjectOnPlane(
-                    (other.transform.position - transform.position).normalized,
-                    surfaceNormal
-                ).normalized;
-
-                _facingDirection = Vector3.Slerp(_facingDirection, toOther, 3f * Time.deltaTime);
-                _facingDirection = Vector3.ProjectOnPlane(_facingDirection, surfaceNormal).normalized;
-                transform.rotation = Quaternion.LookRotation(_facingDirection, surfaceNormal);
-
-                yield return null;
-            }
-        }
-
-        // Phase 2: only initiator backs up — non-initiator stays still
-        // This way distance actually increases and the loop can exit
-        if (isInitiator) {
-            while (true) {
-                float dist = Vector3.Distance(transform.position, other.transform.position);
-                if (dist >= nuzzleDistance) break;
-
-                // Back up along the surface directly away — -_facingDirection is already correct
-                Vector3 surfaceNormal = transform.position.normalized;
-                Vector3 back = Vector3.ProjectOnPlane(-_facingDirection, surfaceNormal).normalized;
-                transform.position += back * (approachSpeed * Time.deltaTime);
-                SnapToSurface();
-
-                yield return null;
-            }
-        }
-        else {
-            // Non-initiator just waits until the initiator has backed up enough
-            while (Vector3.Distance(transform.position, other.transform.position) < nuzzleDistance)
-                yield return null;
-        }
-
-        _animator.SetBool(AnimWalking, false);
-
-        // Initiator triggers spawn, non-initiator waits the same time so both sleep together
-        if (isInitiator) {
-            Vector3 midpoint = (transform.position + other.transform.position) * 0.5f;
-            // TODO: yield on your spawn animation here, e.g:
-            //   yield return StartCoroutine(manager.PlaySpawnSequence(midpoint));
-            yield return new WaitForSeconds(manager.spawnAnimationDuration);
-            manager.QueueSpawn(midpoint);
-        }
-        else {
-            yield return new WaitForSeconds(manager.spawnAnimationDuration);
-        }
-
-        _animator.SetBool(AnimSleeping, true);
-        yield return new WaitForSeconds(interactionSleepDuration);
-
-        _animator.SetBool(AnimSleeping, false);
-        _animator.SetBool(AnimWalking, true);
-        isGrazing = false;
-        isSleeping = false;
-        _wanderTimer = 2f + Random.Range(-1f, 1f);
-        PickNewWanderDirection();
     }
 
-    // --- SELECT / DESELECT ---
+    void PickWanderDir() =>
+        _moveDir = Vector3.ProjectOnPlane(Random.onUnitSphere, transform.position.normalized).normalized;
 
-    public void Select(PlanetCameraOrbit cam) {
-        _animator.SetBool(AnimWalking, false);
-        _animator.SetBool(AnimGrazing, false);
-        _animator.SetBool(AnimInAir, true);
+    public void Pickup() {
+        EnterState(State.Held);
+        _cameraAligned = false;
+        _facingFrozen = true;
+        _hoveredCollider = null;
+        _safeDropTarget = Vector3.zero;
+        _hasPendingState = false;
         FadeDropShadow(0.4f);
-
-        selected = true;
-        _cameraReady = false;
-        _camController = cam;
-        _screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
-        _targetMeshOffset = selectedHeight;
-        changingHeight = true;
-        SnapToSurface();
+        _meshOffsetTarget = selectedHeight;
+        _changingHeight = true;
+        if (_cam == null) _cam = FindFirstObjectByType<PlanetCameraController>();
+        _screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
     }
 
-    public void NotifyCameraReady() {
-        _cameraReady = true;
+    public void NotifyCameraAligned() {
+        if (_state != State.Held) return;
+        _moveDir = _facingDir;
+        _cameraAligned = true;
+        _facingFrozen = false;
     }
 
-    public void Deselect() {
-        _animator.SetBool(AnimInAir, false);
-        FadeDropShadow(0f);
-
-        selected = false;
-        _camController = null;
-        _targetMeshOffset = 0;
-        changingHeight = true;
-
-        _safeDropTarget = FindSafeDropPosition();
-        SnapToSurface();
-
-        if (currentSheepCollider != null) {
-            Sheep other = currentSheepCollider.transform.parent.parent.GetComponent<Sheep>();
-            other.FadeHighlight(0f);
-            currentSheepCollider = null;
-            StartInteraction(other);
-            return;
+    public void Release() {
+        if (_hoveredCollider != null) {
+            SheepFrom(_hoveredCollider)?.FadeHighlight(0f);
+            _hoveredCollider = null;
         }
 
-        if (!isGrazing) {
-            _animator.SetBool(AnimWalking, true);
-            _animator.SetBool(AnimGrazing, false);
+        FadeDropShadow(0f);
+        _cameraAligned = false;
+        _meshOffsetTarget = 0f;
+        _changingHeight = true;
+        _descentTimer = 0f;
+        _safeDropTarget = FindSafeDropPosition(excludeSelf: true);
+        _wanderTimer = Random.Range(1f, 3f);
+        _speedScale = 0f;
+        _moveDir = _facingDir;
+        EnterState(State.Walking);
+    }
+
+    void NudgeToScreenCenter() {
+        Vector3 screen = _cam.Cam.WorldToScreenPoint(transform.position);
+
+        Vector3 pushDir;
+        float strength;
+
+        if (screen.z < 0f) {
+            pushDir = OnSurface(_cam.Cam.transform.forward);
+            strength = moveSpeed * screenCenterPull * 10f;
         }
         else {
-            _animator.SetBool(AnimWalking, false);
-            _animator.SetBool(AnimGrazing, true);
+            Vector2 delta = _screenCenter - new Vector2(screen.x, screen.y);
+            float dist = delta.magnitude;
+            float deadPx = screenCenterDeadZone * Screen.height;
+            float maxPx = maxScreenDistance * Screen.height;
+            if (dist < deadPx) return;
+
+            float t = (dist - deadPx) / (maxPx - deadPx);
+            float k = t <= 1f ? Mathf.Pow(t, 3f) : 1f + Mathf.Pow(t - 1f, 2f);
+            pushDir = OnSurface(_cam.Cam.transform.right * delta.x + _cam.Cam.transform.up * delta.y);
+            strength = moveSpeed * screenCenterPull * k;
+        }
+
+        if (pushDir.sqrMagnitude < 0.0001f) return;
+        transform.position = (transform.position + pushDir * (strength * Time.deltaTime)).normalized
+                             * (planetRadius + surfaceOffset);
+        _moveDir = OnSurface(pushDir);
+    }
+
+    void CheckForSuitors() {
+        if (_changingHeight) return;
+        const float r = 1.5f;
+
+        Vector3 surfacePos = transform.position.normalized * (planetRadius + surfaceOffset);
+        Collider best = null;
+        foreach (var c in Physics.OverlapSphere(surfacePos, r, _botLayer)) {
+            var s = SheepFrom(c);
+            if (s != null && s != this) { best = c; break; }
+        }
+
+        if (best == _hoveredCollider) return;
+        SheepFrom(_hoveredCollider)?.FadeHighlight(0f);
+        _hoveredCollider = best;
+        SheepFrom(best)?.FadeHighlight(10f);
+    }
+
+    void UpdateDescent() {
+        if (!_changingHeight) return;
+
+        _descentTimer += Time.deltaTime;
+        float t = 1f - Mathf.Exp(-5f * Time.deltaTime);
+        _meshOffset = Mathf.Lerp(_meshOffset, _meshOffsetTarget, t);
+        if (Mathf.Abs(_meshOffset - _meshOffsetTarget) < 0.05f || _descentTimer > 1f) {
+            _meshOffset = _meshOffsetTarget;
+            _changingHeight = false;
+            if (_hasPendingState && _safeDropTarget == Vector3.zero)
+                ApplyPendingState();
+        }
+        _mesh.localPosition = Vector3.up * _meshOffset;
+
+        if (_safeDropTarget == Vector3.zero || _meshOffsetTarget > 0f) return;
+
+        float descentFraction = 1f - Mathf.Clamp01(_meshOffset / selectedHeight);
+        if (descentFraction < 0.1f) return;
+
+        Vector3 slideDir = OnSurface(_safeDropTarget - transform.position);
+        if (slideDir.sqrMagnitude > 0.0001f) _facingDir = Vector3.Slerp(_facingDir, slideDir, 4f * Time.deltaTime);
+        transform.position = Vector3.Slerp(transform.position, _safeDropTarget, 2.5f * Time.deltaTime);
+
+        transform.position = Vector3.Slerp(transform.position, _safeDropTarget, 2.5f * Time.deltaTime); if (Vector3.Distance(transform.position, _safeDropTarget) < 0.01f) {
+            transform.position = _safeDropTarget;
+            _safeDropTarget = Vector3.zero;
+            if (!_changingHeight && _hasPendingState)
+                ApplyPendingState();
         }
     }
 
-    // --- MOVEMENT / SURFACE ---
+    void ApplyPendingState() {
+        Debug.Log(_moveDir + " - " + _facingDir);
 
-    void NudgeTowardScreenCenter() {
-        if (_camController == null) return;
-
-        float deadZonePx = screenCenterDeadZone * Screen.height;
-        float maxDistPx = maxScreenDistance * Screen.height;
-
-        Vector3 sheepScreen = _camController.Cam.WorldToScreenPoint(transform.position);
-
-        if (sheepScreen.z < 0f) {
-            Vector3 surfaceNormalBehind = transform.position.normalized;
-            Vector3 camForward = _camController.Cam.transform.forward;
-            Vector3 pullDir = Vector3.ProjectOnPlane(camForward, surfaceNormalBehind).normalized;
-            if (pullDir.sqrMagnitude < 0.0001f) return;
-
-            float hardSpeed = moveSpeed * screenCenterPull * 10f;
-            Vector3 newPosBehind = transform.position + pullDir * (hardSpeed * Time.deltaTime);
-            transform.position = newPosBehind.normalized * (planetRadius + surfaceOffset);
-
-            Vector3 tangentBehind = Vector3.ProjectOnPlane(pullDir, transform.position.normalized).normalized;
-            if (tangentBehind.sqrMagnitude > 0.0001f) _moveDirection = tangentBehind;
-            return;
-        }
-
-        Vector2 screenDelta = _screenCenter - new Vector2(sheepScreen.x, sheepScreen.y);
-        float distance = screenDelta.magnitude;
-        if (distance < deadZonePx) return;
-
-        float t = (distance - deadZonePx) / (maxDistPx - deadZonePx);
-        float pullStrength = t <= 1f ? Mathf.Pow(t, 3f) : 1f + Mathf.Pow(t - 1f, 2f);
-
-        Vector3 surfaceNormal = transform.position.normalized;
-        Vector3 camRight = _camController.Cam.transform.right;
-        Vector3 camUp = _camController.Cam.transform.up;
-
-        Vector3 worldNudge = (camRight * screenDelta.x + camUp * screenDelta.y).normalized;
-        Vector3 targetDir = Vector3.ProjectOnPlane(worldNudge, surfaceNormal).normalized;
-        if (targetDir.sqrMagnitude < 0.0001f) return;
-
-        float speed = moveSpeed * screenCenterPull * pullStrength;
-        Vector3 newPos = transform.position + targetDir * (speed * Time.deltaTime);
-        transform.position = newPos.normalized * (planetRadius + surfaceOffset);
-
-        Vector3 tangent = Vector3.ProjectOnPlane(targetDir, transform.position.normalized).normalized;
-        if (tangent.sqrMagnitude > 0.0001f) _moveDirection = tangent;
-    }
-
-    void CheckSheepCollisions() {
-        if (changingHeight) return;
-
-        Collider[] hits = Physics.OverlapSphere(_surfaceCollider.bounds.center, 1f, botLayer);
-
-        if (hits.Length > 0) {
-            Sheep candidate = hits[0].transform.parent.parent.GetComponent<Sheep>();
-            if (!candidate.isSleeping && currentSheepCollider != hits[0]) {
-                if (currentSheepCollider != null)
-                    currentSheepCollider.transform.parent.parent.GetComponent<Sheep>().FadeHighlight(0f);
-                currentSheepCollider = hits[0];
-                candidate.FadeHighlight(10f);
-            }
-            else if (candidate.isSleeping && currentSheepCollider != null) {
-                currentSheepCollider.transform.parent.parent.GetComponent<Sheep>().FadeHighlight(0f);
-                currentSheepCollider = null;
-            }
-        }
-        else if (currentSheepCollider != null) {
-            currentSheepCollider.transform.parent.parent.GetComponent<Sheep>().FadeHighlight(0f);
-            currentSheepCollider = null;
-        }
-    }
-
-    void SmoothFacing() {
-        Vector3 surfaceNormal = transform.position.normalized;
-        Vector3 target = Vector3.ProjectOnPlane(_moveDirection, surfaceNormal).normalized;
-        if (target.sqrMagnitude < 0.0001f) return;
-
-        float smoothSpeed = selected ? directionSmoothing : 3f;
-
-        _facingDirection = Vector3.Slerp(_facingDirection, target, smoothSpeed * Time.deltaTime);
-        _facingDirection = Vector3.ProjectOnPlane(_facingDirection, surfaceNormal).normalized;
-        transform.rotation = Quaternion.LookRotation(_facingDirection, surfaceNormal);
-    }
-
-    void MoveOnSurface() {
-        transform.position += _facingDirection * (moveSpeed * Time.deltaTime);
-    }
-
-    Vector3 FindSafeDropPosition() {
-        Vector3 surfaceNormal = transform.position.normalized;
-        Vector3 basePos = surfaceNormal * (planetRadius + surfaceOffset);
-
-        if (!Physics.CheckSphere(basePos, 0.8f, botLayer))
-            return basePos;
-
-        Vector3 right = Vector3.ProjectOnPlane(Vector3.right, surfaceNormal).normalized;
-        if (right.sqrMagnitude < 0.001f)
-            right = Vector3.ProjectOnPlane(Vector3.forward, surfaceNormal).normalized;
-        Vector3 fwd = Vector3.Cross(surfaceNormal, right).normalized;
-
-        for (int i = 1; i <= 16; i++) {
-            float angle = i * 37f * Mathf.Deg2Rad;
-            float radius = i * 0.5f;
-            Vector3 offset = (right * Mathf.Cos(angle) + fwd * Mathf.Sin(angle)) * radius;
-            Vector3 candidate = (basePos + offset).normalized * (planetRadius + surfaceOffset);
-            if (!Physics.CheckSphere(candidate, 0.8f, botLayer))
-                return candidate;
-        }
-
-        return basePos;
+        _hasPendingState = false;
+        _moveDir = _facingDir;
+        EnterState(_pendingState);
     }
 
     void SnapToSurface() {
-        Vector3 toSheep = transform.position;
-        if (toSheep.sqrMagnitude < 0.0001f) toSheep = Vector3.up;
-        transform.position = toSheep.normalized * (planetRadius + surfaceOffset);
+        Vector3 d = transform.position;
+        transform.position = (d.sqrMagnitude > 0.0001f ? d.normalized : Vector3.up)
+                             * (planetRadius + surfaceOffset);
     }
 
-    void CheckForSheep() {
-        // Single raycast — no loop, no crash risk
-        if (Physics.Raycast(transform.position, _facingDirection, out hit, 2f, botLayer))
-            PickNewWanderDirection();
+    Vector3 OnSurface(Vector3 v) =>
+        Vector3.ProjectOnPlane(v, transform.position.normalized).normalized;
+
+    void SmoothFacing(float speed) {
+        Vector3 target = OnSurface(_moveDir);
+        if (target.sqrMagnitude < 0.0001f) return;
+        Vector3 sn = transform.position.normalized;
+        _facingDir = Vector3.ProjectOnPlane(
+            Vector3.Slerp(_facingDir, target, speed * Time.deltaTime), sn).normalized;
+        transform.rotation = Quaternion.LookRotation(_facingDir, sn);
     }
 
-    void PickNewWanderDirection() {
-        Vector3 surfaceNormal = transform.position.normalized;
-        _moveDirection = Vector3.ProjectOnPlane(Random.onUnitSphere, surfaceNormal).normalized;
+    Vector3 FindSafeDropPosition(bool excludeSelf = false, Sheep exclude = null) {
+        Vector3 sn = transform.position.normalized;
+        Vector3 base_ = sn * (planetRadius + surfaceOffset);
+        if (IsClear(base_, excludeSelf, exclude)) return base_;
+
+        Vector3 right = Vector3.ProjectOnPlane(Vector3.right, sn).normalized;
+        if (right.sqrMagnitude < 0.001f)
+            right = Vector3.ProjectOnPlane(Vector3.forward, sn).normalized;
+        Vector3 fwd = Vector3.Cross(sn, right).normalized;
+
+        for (int i = 1; i <= 16; i++) {
+            float a = i * 37f * Mathf.Deg2Rad;
+            Vector3 candidate = (base_ + (right * Mathf.Cos(a) + fwd * Mathf.Sin(a)) * (i * 0.5f))
+                                .normalized * (planetRadius + surfaceOffset);
+            if (IsClear(candidate, excludeSelf, exclude)) return candidate;
+        }
+        return base_;
     }
 
-    // --- PLACEMENT ---
-
-    public void PlaceOnSphere(Vector3 worldPosition) {
-        if (worldPosition.sqrMagnitude < 0.0001f) worldPosition = Vector3.up;
-        transform.position = planet.position + worldPosition.normalized * (planetRadius + surfaceOffset);
-        PickNewWanderDirection();
+    bool IsClear(Vector3 pos, bool excludeSelf, Sheep exclude) {
+        foreach (var c in Physics.OverlapSphere(pos, 1f, _botLayer)) {
+            var s = SheepFrom(c);
+            if (s == null) continue;
+            if (excludeSelf && s == this) continue;
+            if (s == exclude) continue;
+            return false;
+        }
+        return true;
     }
 
-    public void PlaceOnSphere(float latitudeDeg, float longitudeDeg) {
-        float lat = latitudeDeg * Mathf.Deg2Rad;
-        float lon = longitudeDeg * Mathf.Deg2Rad;
-        Vector3 dir = new Vector3(
+    public void SnapAndSeparate() => transform.position = FindSafeDropPosition();
+
+    public void PlaceOnSphere(Vector3 worldPos) {
+        if (worldPos.sqrMagnitude < 0.0001f) worldPos = Vector3.up;
+        transform.position = planet.position + worldPos.normalized * (planetRadius + surfaceOffset);
+        PickWanderDir();
+    }
+
+    public void PlaceOnSphere(float latDeg, float lonDeg) {
+        float lat = latDeg * Mathf.Deg2Rad;
+        float lon = lonDeg * Mathf.Deg2Rad;
+        transform.position = new Vector3(
             Mathf.Cos(lat) * Mathf.Sin(lon),
             Mathf.Sin(lat),
-            Mathf.Cos(lat) * Mathf.Cos(lon)
-        );
-        transform.position = dir * (planetRadius + surfaceOffset);
-        PickNewWanderDirection();
+            Mathf.Cos(lat) * Mathf.Cos(lon)) * (planetRadius + surfaceOffset);
+        PickWanderDir();
     }
-
-    // --- VISUALS ---
 
     public void FadeHighlight(float target) {
-        if (currentlyFadingHighlight != null) StopCoroutine(currentlyFadingHighlight);
-        currentlyFadingHighlight = StartCoroutine(BodyGlow(target));
+        if (_highlightCoroutine != null) StopCoroutine(_highlightCoroutine);
+        _highlightCoroutine = StartCoroutine(FadeEmissive(target));
     }
 
-    IEnumerator BodyGlow(float targetIntensity) {
-        Color baseColor = new Color(0.8803151f, 0.5257697f, 0f);
-        Color currentEmissive = _bodyMat.GetColor("_EmissiveColor");
-        float currentIntensity = currentEmissive.r / baseColor.r;
-        float t = 0f;
-        while (t < 1f) {
-            t += Time.deltaTime * 5f;
-            _bodyMat.SetColor("_EmissiveColor", baseColor * Mathf.Lerp(currentIntensity, targetIntensity, t));
+    IEnumerator FadeEmissive(float to) {
+        Color base_ = new Color(0.8803151f, 0.5257697f, 0f);
+        float from = _bodyMat.GetColor("_EmissiveColor").r / base_.r;
+        for (float t = 0f; t < 1f; t += Time.deltaTime * 5f) {
+            _bodyMat.SetColor("_EmissiveColor", base_ * Mathf.Lerp(from, to, t));
             yield return null;
         }
+        _bodyMat.SetColor("_EmissiveColor", base_ * to);
     }
 
     public void FadeDropShadow(float target) {
-        if (currentlyFadingDropShadow != null) StopCoroutine(currentlyFadingDropShadow);
-        currentlyFadingDropShadow = StartCoroutine(DropShadow(target));
+        if (_shadowCoroutine != null) StopCoroutine(_shadowCoroutine);
+        _shadowCoroutine = StartCoroutine(FadeShadow(target));
     }
 
-    IEnumerator DropShadow(float targetIntensity) {
-        float currentIntensity = _dropShadowMat.color.a;
-        Color c = _dropShadowMat.color;
-        float t = 0f;
-        while (t < 1f) {
-            t += Time.deltaTime * 5f;
-            c.a = Mathf.Lerp(currentIntensity, targetIntensity, t);
-            _dropShadowMat.color = c;
-            _dropShadow.localScale = new Vector3(c.a * 5f, 0.01f, c.a * 5f);
+    IEnumerator FadeShadow(float to) {
+        float from = _dropShadowMat.color.a;
+        for (float t = 0f; t < 1f; t += Time.deltaTime * 5f) {
+            float a = Mathf.Lerp(from, to, t);
+            _dropShadowMat.color = new Color(0f, 0f, 0f, a);
+            _dropShadow.localScale = new Vector3(a * 5f, 0.01f, a * 5f);
             yield return null;
         }
+        _dropShadowMat.color = new Color(0f, 0f, 0f, to);
+        _dropShadow.localScale = new Vector3(to * 5f, 0.01f, to * 5f);
     }
+
+    static Sheep SheepFrom(Collider c) =>
+        c?.transform.parent?.parent?.GetComponent<Sheep>();
 
     void OnDrawGizmosSelected() {
         Gizmos.color = Color.cyan;

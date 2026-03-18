@@ -469,13 +469,9 @@ MonoBehaviour:
   selectedHeight: 5
   surfaceOffset: 0.5
   screenCenterPull: 2.5
-  directionSmoothing: 100
+  directionSmoothing: 8
   screenCenterDeadZone: 0.01
   maxScreenDistance: 0.05
-  approachSpeed: 1.5
-  nuzzleDistance: 0.5
-  interactionSleepDuration: 3
-  isSleeping: 0
 --- !u!95 &2899189273870187352
 Animator:
   serializedVersion: 7
