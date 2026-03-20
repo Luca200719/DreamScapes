@@ -2633,7 +2633,6 @@ MonoBehaviour:
   orbitSpeed: 50
   smoothing: 8
   sheepOrbitSensitivity: 0.6
-  scrollSpeed: 5
   minDistance: 2
   maxDistance: 150
 --- !u!114 &1312080327
@@ -2719,9 +2718,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SheepSpawner
   planet: {fileID: 919132147575291695}
   sheepPrefab: {fileID: 4427295489415076725, guid: e10fa610020ac944ea7e7726aca2ebd9, type: 3}
-  initialSheepCount: 2
+  initialSheepCount: 20
   sheep: []
-  spawnAnimationDuration: 2
 --- !u!1 &1371566998
 GameObject:
   m_ObjectHideFlags: 0

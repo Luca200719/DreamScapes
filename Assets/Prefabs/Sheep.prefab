@@ -472,6 +472,7 @@ MonoBehaviour:
   directionSmoothing: 8
   screenCenterDeadZone: 0.01
   maxScreenDistance: 0.05
+  heightSpeed: 10
 --- !u!95 &2899189273870187352
 Animator:
   serializedVersion: 7

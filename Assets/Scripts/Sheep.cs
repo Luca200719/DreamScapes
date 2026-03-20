@@ -15,6 +15,8 @@ public class Sheep : MonoBehaviour {
     public float screenCenterDeadZone = 0.01f;
     public float maxScreenDistance = 0.05f;
 
+    public float heightSpeed = 10f;
+
     enum State { Walking = 0, Grazing = 1, Held = 2 }
     State _state = State.Walking;
 
@@ -45,6 +47,7 @@ public class Sheep : MonoBehaviour {
     Vector3 _safeDropTarget;
     State _pendingState;
     bool _hasPendingState;
+    public Vector3 ReservedLandingSpot => _changingHeight && _meshOffsetTarget == 0f && _safeDropTarget != Vector3.zero ? _safeDropTarget : Vector3.zero;
 
     static PlanetCameraController _cam;
     static Vector2 _screenCenter;
@@ -56,6 +59,8 @@ public class Sheep : MonoBehaviour {
     Coroutine _highlightCoroutine;
     Coroutine _shadowCoroutine;
 
+    static readonly Color EmissiveBase = new Color(0.8803151f, 0.5257697f, 0f);
+
     void Start() {
         _animator = GetComponent<Animator>();
         _mesh = transform.GetChild(0);
@@ -64,6 +69,8 @@ public class Sheep : MonoBehaviour {
         _dropShadow = transform.GetChild(2);
         _dropShadowMat = transform.GetChild(2).GetComponent<MeshRenderer>().material;
         _botLayer = LayerMask.GetMask("BotRaycast");
+
+        if (_cam == null) _cam = FindFirstObjectByType<PlanetCameraController>();
 
         _speedScale = 1f;
         _wanderTimer = Random.Range(1f, 3f);
@@ -74,6 +81,9 @@ public class Sheep : MonoBehaviour {
     }
 
     void Update() {
+        if (_state == State.Held)
+            _screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+
         UpdateDescent();
 
         switch (_state) {
@@ -96,7 +106,9 @@ public class Sheep : MonoBehaviour {
 
         if (_state == State.Walking) {
             transform.position += _facingDir * (moveSpeed * _speedScale * Time.deltaTime);
-            if (!_changingHeight) SeparateFromNearbySheep();
+            if (!_changingHeight) {
+                ApplyNeighbourAvoidance();
+            }
 
             SnapToSurface();
             SmoothFacing(3f);
@@ -112,23 +124,44 @@ public class Sheep : MonoBehaviour {
         else EnterState(State.Grazing);
     }
 
-    void SeparateFromNearbySheep() {
-        const float r = 1.5f;
-        foreach (var c in Physics.OverlapSphere(_surfaceCollider.bounds.center, r, _botLayer)) {
-            var other = SheepFrom(c);
-            if (other == null || other == this || other._changingHeight || other._hasPendingState) continue; Vector3 sn = transform.position.normalized;
-            Vector3 away = Vector3.ProjectOnPlane(transform.position - other.transform.position, sn);
-            float overlap = r - away.magnitude;
-            if (overlap <= 0f) continue;
-            if (away.sqrMagnitude < 0.0001f) away = Vector3.ProjectOnPlane(Random.onUnitSphere, sn);
-            transform.position += away.normalized * overlap;
-            SnapToSurface();
-            _moveDir = Vector3.Slerp(_moveDir, away.normalized, 0.5f);
+    void ApplyNeighbourAvoidance() {
+        const float avoidRadius = 1.5f;
+        const float avoidCore = 1f;
+        const float steerRate = 100f;
+
+        Vector3 sn = transform.position.normalized;
+        Vector3 steerAway = Vector3.zero;
+        float maxWeight = 0f;
+
+        foreach (var s in manager.sheep) {
+            if (s == this || s.ReservedLandingSpot == Vector3.zero) continue;
+            Vector3 away = Vector3.ProjectOnPlane(transform.position - s.ReservedLandingSpot, sn);
+            float dist = away.magnitude;
+            if (dist >= avoidRadius) continue;
+            float weight = 1f - Mathf.Clamp01((dist - avoidCore) / (avoidRadius - avoidCore));
+            steerAway += away.normalized * weight;
+            if (weight > maxWeight) maxWeight = weight;
         }
+
+        foreach (var c in Physics.OverlapSphere(_surfaceCollider.bounds.center, avoidRadius, _botLayer)) {
+            var other = SheepFrom(c);
+            if (other == null || other == this || other._changingHeight || other._hasPendingState) continue;
+            Vector3 toOther = Vector3.ProjectOnPlane(other.transform.position - transform.position, sn);
+            if (toOther.sqrMagnitude < 0.0001f) toOther = Vector3.ProjectOnPlane(Random.onUnitSphere, sn);
+            float dist = toOther.magnitude;
+            if (dist >= avoidRadius) continue;
+            float weight = 1f - Mathf.Clamp01((dist - avoidCore) / (avoidRadius - avoidCore));
+            float dot = Vector3.Dot(_facingDir, toOther.normalized);
+            if (dot > 0f) _speedScale = Mathf.Min(_speedScale, 1f - weight * dot);
+            steerAway -= toOther.normalized * weight;
+            if (weight > maxWeight) maxWeight = weight;
+        }
+
+        if (steerAway.sqrMagnitude > 0.0001f)
+            _moveDir = Vector3.Slerp(_moveDir, steerAway.normalized, steerRate * maxWeight * Time.deltaTime).normalized;
     }
 
-    void PickWanderDir() =>
-        _moveDir = Vector3.ProjectOnPlane(Random.onUnitSphere, transform.position.normalized).normalized;
+        void PickWanderDir() => _moveDir = Vector3.ProjectOnPlane(Random.onUnitSphere, transform.position.normalized).normalized;
 
     public void Pickup() {
         EnterState(State.Held);
@@ -140,7 +173,7 @@ public class Sheep : MonoBehaviour {
         FadeDropShadow(0.4f);
         _meshOffsetTarget = selectedHeight;
         _changingHeight = true;
-        if (_cam == null) _cam = FindFirstObjectByType<PlanetCameraController>();
+        _descentTimer = 0f;
         _screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
     }
 
@@ -167,6 +200,8 @@ public class Sheep : MonoBehaviour {
         _speedScale = 0f;
         _moveDir = _facingDir;
         EnterState(State.Walking);
+        _pendingState = State.Walking;
+        _hasPendingState = true;
     }
 
     void NudgeToScreenCenter() {
@@ -219,38 +254,49 @@ public class Sheep : MonoBehaviour {
         if (!_changingHeight) return;
 
         _descentTimer += Time.deltaTime;
-        float t = 1f - Mathf.Exp(-5f * Time.deltaTime);
+
+        float t = 1f - Mathf.Exp(-heightSpeed * Time.deltaTime);
         _meshOffset = Mathf.Lerp(_meshOffset, _meshOffsetTarget, t);
-        if (Mathf.Abs(_meshOffset - _meshOffsetTarget) < 0.05f || _descentTimer > 1f) {
-            _meshOffset = _meshOffsetTarget;
-            _changingHeight = false;
-            if (_hasPendingState && _safeDropTarget == Vector3.zero)
-                ApplyPendingState();
-        }
+
+        bool heightDone = Mathf.Abs(_meshOffset - _meshOffsetTarget) < 0.05f || _descentTimer > 10f;
+        if (heightDone) _meshOffset = _meshOffsetTarget;
         _mesh.localPosition = Vector3.up * _meshOffset;
 
-        if (_safeDropTarget == Vector3.zero || _meshOffsetTarget > 0f) return;
+        // Move horizontally toward the safe drop target while descending.
+        bool posDone = _safeDropTarget == Vector3.zero;
+        if (!posDone && _meshOffsetTarget <= 0f) {
+            float descentFraction = 1f - Mathf.Clamp01(_meshOffset / selectedHeight);
+            if (descentFraction >= 0.1f) {
+                // MoveTowards guarantees arrival; Slerp only asymptotes and may never
+                // cross the arrival threshold when the target is far away.
+                float step = moveSpeed * 2.5f * Time.deltaTime;
+                transform.position = Vector3.MoveTowards(transform.position, _safeDropTarget, step);
+                if (Vector3.Distance(transform.position, _safeDropTarget) < 0.01f) {
+                    transform.position = _safeDropTarget;
+                    posDone = true;
+                    _safeDropTarget = Vector3.zero;
+                }
+            }
+        }
 
-        float descentFraction = 1f - Mathf.Clamp01(_meshOffset / selectedHeight);
-        if (descentFraction < 0.1f) return;
-
-        Vector3 slideDir = OnSurface(_safeDropTarget - transform.position);
-        if (slideDir.sqrMagnitude > 0.0001f) _facingDir = Vector3.Slerp(_facingDir, slideDir, 4f * Time.deltaTime);
-        transform.position = Vector3.Slerp(transform.position, _safeDropTarget, 2.5f * Time.deltaTime);
-
-        transform.position = Vector3.Slerp(transform.position, _safeDropTarget, 2.5f * Time.deltaTime); if (Vector3.Distance(transform.position, _safeDropTarget) < 0.01f) {
-            transform.position = _safeDropTarget;
-            _safeDropTarget = Vector3.zero;
-            if (!_changingHeight && _hasPendingState)
-                ApplyPendingState();
+        // Only mark height change complete once BOTH the mesh height and the
+        // surface position have settled — keeps _changingHeight as a reliable
+        // "sheep is still in transit" flag for CheckForSuitors / UpdateWander.
+        if (heightDone && posDone) {
+            _changingHeight = false;
+            if (_hasPendingState) ApplyPendingState();
         }
     }
 
     void ApplyPendingState() {
-        Debug.Log(_moveDir + " - " + _facingDir);
-
         _hasPendingState = false;
-        _moveDir = _facingDir;
+        _safeDropTarget = Vector3.zero;
+        _wanderTimer = Random.Range(1f, 3f);
+        SnapToSurface();
+        // No position push or _facingDir snap here — the landing spot is already clear,
+        // and avoidance steering will gently guide the sheep away each frame via
+        // ApplyNeighbourAvoidance in UpdateWander.
+        _speedScale = 0f;
         EnterState(_pendingState);
     }
 
@@ -267,9 +313,11 @@ public class Sheep : MonoBehaviour {
         Vector3 target = OnSurface(_moveDir);
         if (target.sqrMagnitude < 0.0001f) return;
         Vector3 sn = transform.position.normalized;
-        _facingDir = Vector3.ProjectOnPlane(
-            Vector3.Slerp(_facingDir, target, speed * Time.deltaTime), sn).normalized;
-        transform.rotation = Quaternion.LookRotation(_facingDir, sn);
+        Quaternion current = Quaternion.LookRotation(_facingDir, sn);
+        Quaternion desired = Quaternion.LookRotation(target, sn);
+        Quaternion result = Quaternion.RotateTowards(current, desired, speed * 45f * Time.deltaTime);
+        _facingDir = result * Vector3.forward;
+        transform.rotation = result;
     }
 
     Vector3 FindSafeDropPosition(bool excludeSelf = false, Sheep exclude = null) {
@@ -292,12 +340,18 @@ public class Sheep : MonoBehaviour {
     }
 
     bool IsClear(Vector3 pos, bool excludeSelf, Sheep exclude) {
-        foreach (var c in Physics.OverlapSphere(pos, 1f, _botLayer)) {
+        Vector3 posNorm = pos.normalized;
+        foreach (var c in Physics.OverlapCapsule(pos - posNorm * 0.1f, pos + posNorm * 0.1f, 0.675f, _botLayer)) {
             var s = SheepFrom(c);
             if (s == null) continue;
             if (excludeSelf && s == this) continue;
             if (s == exclude) continue;
             return false;
+        }
+
+        foreach (var s in manager.sheep) {
+            if (s == this || s.ReservedLandingSpot == Vector3.zero) continue;
+            if (Vector3.Distance(pos, s.ReservedLandingSpot) < 1.35f) return false;
         }
         return true;
     }
@@ -313,10 +367,7 @@ public class Sheep : MonoBehaviour {
     public void PlaceOnSphere(float latDeg, float lonDeg) {
         float lat = latDeg * Mathf.Deg2Rad;
         float lon = lonDeg * Mathf.Deg2Rad;
-        transform.position = new Vector3(
-            Mathf.Cos(lat) * Mathf.Sin(lon),
-            Mathf.Sin(lat),
-            Mathf.Cos(lat) * Mathf.Cos(lon)) * (planetRadius + surfaceOffset);
+        transform.position = new Vector3(Mathf.Cos(lat) * Mathf.Sin(lon), Mathf.Sin(lat), Mathf.Cos(lat) * Mathf.Cos(lon)) * (planetRadius + surfaceOffset);
         PickWanderDir();
     }
 
@@ -326,13 +377,12 @@ public class Sheep : MonoBehaviour {
     }
 
     IEnumerator FadeEmissive(float to) {
-        Color base_ = new Color(0.8803151f, 0.5257697f, 0f);
-        float from = _bodyMat.GetColor("_EmissiveColor").r / base_.r;
+        float from = _bodyMat.GetColor("_EmissiveColor").r / EmissiveBase.r;
         for (float t = 0f; t < 1f; t += Time.deltaTime * 5f) {
-            _bodyMat.SetColor("_EmissiveColor", base_ * Mathf.Lerp(from, to, t));
+            _bodyMat.SetColor("_EmissiveColor", EmissiveBase * Mathf.Lerp(from, to, t));
             yield return null;
         }
-        _bodyMat.SetColor("_EmissiveColor", base_ * to);
+        _bodyMat.SetColor("_EmissiveColor", EmissiveBase * to);
     }
 
     public void FadeDropShadow(float target) {
