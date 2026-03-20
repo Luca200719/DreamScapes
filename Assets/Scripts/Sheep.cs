@@ -262,13 +262,10 @@ public class Sheep : MonoBehaviour {
         if (heightDone) _meshOffset = _meshOffsetTarget;
         _mesh.localPosition = Vector3.up * _meshOffset;
 
-        // Move horizontally toward the safe drop target while descending.
         bool posDone = _safeDropTarget == Vector3.zero;
         if (!posDone && _meshOffsetTarget <= 0f) {
             float descentFraction = 1f - Mathf.Clamp01(_meshOffset / selectedHeight);
             if (descentFraction >= 0.1f) {
-                // MoveTowards guarantees arrival; Slerp only asymptotes and may never
-                // cross the arrival threshold when the target is far away.
                 float step = moveSpeed * 2.5f * Time.deltaTime;
                 transform.position = Vector3.MoveTowards(transform.position, _safeDropTarget, step);
                 if (Vector3.Distance(transform.position, _safeDropTarget) < 0.01f) {
@@ -279,9 +276,6 @@ public class Sheep : MonoBehaviour {
             }
         }
 
-        // Only mark height change complete once BOTH the mesh height and the
-        // surface position have settled — keeps _changingHeight as a reliable
-        // "sheep is still in transit" flag for CheckForSuitors / UpdateWander.
         if (heightDone && posDone) {
             _changingHeight = false;
             if (_hasPendingState) ApplyPendingState();
@@ -293,9 +287,6 @@ public class Sheep : MonoBehaviour {
         _safeDropTarget = Vector3.zero;
         _wanderTimer = Random.Range(1f, 3f);
         SnapToSurface();
-        // No position push or _facingDir snap here — the landing spot is already clear,
-        // and avoidance steering will gently guide the sheep away each frame via
-        // ApplyNeighbourAvoidance in UpdateWander.
         _speedScale = 0f;
         EnterState(_pendingState);
     }
