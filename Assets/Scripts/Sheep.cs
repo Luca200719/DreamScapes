@@ -17,8 +17,6 @@ public class Sheep : MonoBehaviour {
 
     public float heightSpeed = 10f;
 
-    // How often (in seconds) each walking sheep runs avoidance + obstacle checks.
-    // 10 Hz is imperceptible to the player and cuts per-frame physics cost ~10x.
     const float AvoidanceInterval = 0.1f;
 
     enum State { Walking = 0, Grazing = 1, Held = 2 }
@@ -31,7 +29,6 @@ public class Sheep : MonoBehaviour {
 
     Animator _animator;
     static readonly int AnimState = Animator.StringToHash("state");
-    // FIX: cache property ID so SetColor/GetColor never hash a string at runtime.
     static readonly int EmissiveColor = Shader.PropertyToID("_EmissiveColor");
 
     Transform _mesh;
@@ -45,8 +42,7 @@ public class Sheep : MonoBehaviour {
     Vector3 _facingDir;
     float _wanderTimer;
     float _speedScale;
-
-    // FIX: stagger avoidance — only recalculate every AvoidanceInterval seconds.
+    
     float _avoidanceTimer;
 
     bool _changingHeight;
@@ -84,7 +80,6 @@ public class Sheep : MonoBehaviour {
 
         _speedScale = 1f;
         _wanderTimer = Random.Range(1f, 3f);
-        // Stagger avoidance timers so all sheep don't fire on the same frame.
         _avoidanceTimer = Random.Range(0f, AvoidanceInterval);
         SnapToSurface();
         PickWanderDir();
@@ -119,8 +114,6 @@ public class Sheep : MonoBehaviour {
         if (_state == State.Walking) {
             transform.position += _facingDir * (moveSpeed * _speedScale * Time.deltaTime);
 
-            // FIX: avoidance and obstacle raycast are now staggered — they only
-            // run every AvoidanceInterval seconds instead of every frame.
             if (!_changingHeight) {
                 _avoidanceTimer -= Time.deltaTime;
                 if (_avoidanceTimer <= 0f) {
@@ -186,7 +179,6 @@ public class Sheep : MonoBehaviour {
     void PickWanderDir() => _moveDir = Vector3.ProjectOnPlane(Random.onUnitSphere, transform.position.normalized).normalized;
 
     public void Pickup() {
-        // Cancel any in-progress async drop search.
         if (_dropSearchCoroutine != null) {
             StopCoroutine(_dropSearchCoroutine);
             _dropSearchCoroutine = null;
@@ -230,8 +222,6 @@ public class Sheep : MonoBehaviour {
         _pendingState = State.Walking;
         _hasPendingState = true;
 
-        // FIX: search for a safe landing spot across multiple frames instead of
-        // running up to 17 OverlapCapsule queries synchronously in one frame.
         _dropSearchCoroutine = StartCoroutine(FindSafeDropAsync());
     }
 
@@ -342,9 +332,6 @@ public class Sheep : MonoBehaviour {
         transform.rotation = result;
     }
 
-    // FIX: async version of FindSafeDropPosition — tests a batch of candidates
-    // per frame (every 4 candidates yields once) so the cost is spread over
-    // several frames instead of spiking in the single frame the sheep is dropped.
     IEnumerator FindSafeDropAsync() {
         Vector3 sn = transform.position.normalized;
         Vector3 base_ = sn * (planetRadius + surfaceOffset);
@@ -371,7 +358,6 @@ public class Sheep : MonoBehaviour {
                 yield break;
             }
 
-            // Yield every 4 candidates to spread the capsule queries across frames.
             if (i % 4 == 0) yield return null;
         }
 
@@ -379,7 +365,6 @@ public class Sheep : MonoBehaviour {
         _dropSearchCoroutine = null;
     }
 
-    // Synchronous version kept for SnapAndSeparate (called at spawn, not at runtime).
     Vector3 FindSafeDropPosition(bool excludeSelf = false, Sheep exclude = null) {
         Vector3 sn = transform.position.normalized;
         Vector3 base_ = sn * (planetRadius + surfaceOffset);
@@ -409,7 +394,6 @@ public class Sheep : MonoBehaviour {
             return false;
         }
 
-        // FIX: use sqrMagnitude to avoid Mathf.Sqrt inside the reservation scan.
         const float reservationRadiusSq = 1.35f * 1.35f;
         foreach (var s in manager.sheep) {
             if (s == this || s.ReservedLandingSpot == Vector3.zero) continue;
@@ -439,7 +423,6 @@ public class Sheep : MonoBehaviour {
     }
 
     IEnumerator FadeEmissive(float to) {
-        // FIX: use cached property ID instead of string to avoid per-call hashing.
         float from = _bodyMat.GetColor(EmissiveColor).r / EmissiveBase.r;
         for (float t = 0f; t < 1f; t += Time.deltaTime * 5f) {
             _bodyMat.SetColor(EmissiveColor, EmissiveBase * Mathf.Lerp(from, to, t));
